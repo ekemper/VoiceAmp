@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 100px; /* Adjusts all anchor navigation to account for fixed header */
+  }
+}
+
+:root {
+  /* New color scheme */
+  /* Deep Navy Blue */
+  --navy: 220 75% 20%;
+  /* Teal/Turquoise */
+  --teal: 175 55% 45%;
+  /* Light Gray */
+  --gray: 0 0% 85%;
+  /* Orange/Amber */
+  --amber: 35 90% 50%;
+  /* Burgundy/Brown */
+  --burgundy: 350 40% 35%;
+  
+  --background: 0 0% 100%;
+  --foreground: 220 75% 20%;
+  --muted: 0 0% 95%;
+  --muted-foreground: 220 10% 40%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 75% 20%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 75% 20%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+  --primary: 220 75% 20%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 175 55% 45%;
+  --secondary-foreground: 0 0% 100%;
+  --accent: 35 90% 50%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 350 40% 35%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 175 55% 45%;
+  --radius: 0.5rem;
+  }
+  .dark {
+  /* Dark theme colors based on the same palette */
+  --background: 220 35% 15%;
+  --foreground: 0 0% 95%;
+  --muted: 220 25% 25%;
+  --muted-foreground: 175 20% 70%;
+  --popover: 220 35% 15%;
+  --popover-foreground: 0 0% 95%;
+  --card: 220 35% 15%;
+  --card-foreground: 0 0% 95%;
+  --border: 220 30% 25%;
+  --input: 220 30% 25%;
+  --primary: 175 55% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 75% 25%;
+  --secondary-foreground: 0 0% 100%;
+  --accent: 35 90% 50%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 350 50% 40%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 175 55% 45%;
+  --radius: 0.5rem;
+  }
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Custom utility classes for our color scheme */
+.bg-navy {
+  background-color: hsl(var(--navy));
+}
+.text-navy {
+  color: hsl(var(--navy));
+}
+.bg-teal {
+  background-color: hsl(var(--teal));
+}
+.text-teal {
+  color: hsl(var(--teal));
+}
+.bg-gray-custom {
+  background-color: hsl(var(--gray));
+}
+.text-gray-custom {
+  color: hsl(var(--gray));
+}
+.bg-amber {
+  background-color: hsl(var(--amber));
+}
+.text-amber {
+  color: hsl(var(--amber));
+}
+.bg-burgundy {
+  background-color: hsl(var(--burgundy));
+}
+.text-burgundy {
+  color: hsl(var(--burgundy));
+}
+
+/* Gradient backgrounds */
+.bg-gradient-navy-teal {
+  background: linear-gradient(135deg, hsl(var(--navy)), hsl(var(--teal)));
+}
+.bg-gradient-teal-amber {
+  background: linear-gradient(135deg, hsl(var(--teal)), hsl(var(--amber)));
+}
+.bg-gradient-amber-burgundy {
+  background: linear-gradient(135deg, hsl(var(--amber)), hsl(var(--burgundy)));
+}
+

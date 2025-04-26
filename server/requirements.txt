@@ -1,0 +1,18 @@
+# Core dependencies
+openai>=1.0.0
+faiss-cpu>=1.7.4
+python-dotenv>=1.0.0
+unstructured>=0.11.0
+numpy>=1.24.0
+flask>=3.0.0
+werkzeug>=3.0.0
+flask-cors>=4.0.0
+
+# Test dependencies
+pytest>=7.4.0
+
+# Development dependencies
+watchdog>=3.0.0
+
+# SSL handling
+urllib3<2.0.0
