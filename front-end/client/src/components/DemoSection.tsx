@@ -4,6 +4,7 @@ import { Progress } from "./ui/progress";
 import { useToast } from "@/hooks/use-toast";
 // @ts-ignore: If dompurify types are missing, install with: npm install dompurify @types/dompurify
 import DOMPurify from 'dompurify';
+import React from 'react';
 
 function fileArrayToFileList(files: File[]): FileList {
   const dataTransfer = new DataTransfer();
@@ -20,6 +21,10 @@ export default function DemoSection() {
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [processingFiles, setProcessingFiles] = useState<{ [key: string]: boolean }>({});
   const [voiceText, setVoiceText] = useState("");
+  const [queryText, setQueryText] = useState("");
+  const [queryResult, setQueryResult] = useState<string | null>(null);
+  const [querySources, setQuerySources] = useState<string[] | null>(null);
+  const [queryLoading, setQueryLoading] = useState(false);
 
   // Log every render
   console.log("[RENDER] DemoSection", {
@@ -48,9 +53,7 @@ export default function DemoSection() {
 
   // Sanitize input for XSS and basic SQLi patterns
   function sanitizeInput(input: string) {
-    // Remove HTML tags and encode special characters
     let clean = DOMPurify.sanitize(input, {ALLOWED_TAGS: [], ALLOWED_ATTR: []});
-    // Remove common SQL injection patterns (very basic)
     clean = clean.replace(/['";\-\-]/g, '');
     return clean;
   }
@@ -150,6 +153,43 @@ export default function DemoSection() {
     await handleFileUpload(mockEvent);
     // Optionally clear the textarea after upload
     setVoiceText("");
+  };
+
+  // Handle AI Assistant Query
+  const handleQuerySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setQueryResult(null);
+    setQuerySources(null);
+    const sanitized = sanitizeInput(queryText.trim());
+    if (!sanitized) {
+      toast({
+        title: "Error",
+        description: "Please enter a question before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setQueryLoading(true);
+    try {
+      const response = await fetch('http://localhost:5001/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: sanitized })
+      });
+      const data = await response.json();
+      if (response.ok && data.response) {
+        setQueryResult(data.response);
+        setQuerySources(data.sources || null);
+      } else {
+        setQueryResult(data.error || 'An error occurred.');
+        setQuerySources(null);
+      }
+    } catch (err) {
+      setQueryResult('An error occurred while contacting the AI assistant.');
+      setQuerySources(null);
+    } finally {
+      setQueryLoading(false);
+    }
   };
 
   return (
@@ -316,20 +356,25 @@ export default function DemoSection() {
                 {currentStep === 3 && (
                   <div>
                     <h3 className="text-2xl font-bold text-navy mb-6">Step 3: AI Assistant</h3>
-                    <div className="mb-6 bg-gray-custom/20 p-5 rounded-lg border border-teal/10">
-                      <div className="flex items-start mb-2">
-                        <div className="w-8 h-8 bg-navy rounded-full flex items-center justify-center mr-3 mt-1 flex-shrink-0">
-                          <i className="ri-question-line text-sm text-white"></i>
-                        </div>
-                        <div>
-                          <h4 className="text-lg font-bold text-navy">Example Grant Question</h4>
-                          <p className="text-navy mt-2 text-xl italic">
-                            What relationships do you cultivate that are essential to doing your work?
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
+                    <form onSubmit={handleQuerySubmit} className="mb-6 bg-gray-custom/20 p-5 rounded-lg border border-teal/10">
+                      <label htmlFor="ai-query" className="block text-navy font-medium mb-2">Paste your grant question or prompt below:</label>
+                      <input
+                        id="ai-query"
+                        type="text"
+                        className="w-full p-3 rounded-lg border border-teal/30 focus:outline-none focus:ring-2 focus:ring-teal/50 text-black mb-4"
+                        placeholder="e.g. What relationships do you cultivate that are essential to doing your work?"
+                        value={queryText}
+                        onChange={e => setQueryText(e.target.value)}
+                        disabled={queryLoading}
+                      />
+                      <button
+                        type="submit"
+                        className="bg-teal text-white px-6 py-2 rounded-lg hover:bg-teal/90 transition-colors"
+                        disabled={queryLoading}
+                      >
+                        {queryLoading ? 'Thinking...' : 'Ask AI'}
+                      </button>
+                    </form>
                     <div className="bg-gray-custom/20 p-5 rounded-lg border-l-4 border-amber">
                       <div className="flex items-start mb-2">
                         <div className="w-8 h-8 bg-teal rounded-full flex items-center justify-center mr-3 mt-1 flex-shrink-0">
@@ -338,12 +383,21 @@ export default function DemoSection() {
                         <div>
                           <p className="text-sm text-navy/70 mb-1">VoiceAmp Enhanced Response</p>
                           <div className="text-navy whitespace-pre-line">
-                            {isLoading ? "...loading" : ""}
+                            {queryLoading && '...loading'}
+                            {!queryLoading && queryResult && (
+                              <>
+                                <div>{queryResult}</div>
+                                {querySources && querySources.length > 0 && (
+                                  <div className="mt-2 text-xs text-navy/60">
+                                    <strong>Sources:</strong> {querySources.join(', ')}
+                                  </div>
+                                )}
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
                     </div>
-
                     <div className="flex justify-between mt-6">
                       <button 
                         onClick={() => setCurrentStep(2)}
