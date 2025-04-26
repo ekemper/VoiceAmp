@@ -1,7 +1,15 @@
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Progress } from "./ui/progress";
 import { useToast } from "@/hooks/use-toast";
+// @ts-ignore: If dompurify types are missing, install with: npm install dompurify @types/dompurify
+import DOMPurify from 'dompurify';
+
+function fileArrayToFileList(files: File[]): FileList {
+  const dataTransfer = new DataTransfer();
+  files.forEach(file => dataTransfer.items.add(file));
+  return dataTransfer.files;
+}
 
 export default function DemoSection() {
   const { toast } = useToast();
@@ -11,6 +19,41 @@ export default function DemoSection() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [processingFiles, setProcessingFiles] = useState<{ [key: string]: boolean }>({});
+  const [voiceText, setVoiceText] = useState("");
+
+  // Log every render
+  console.log("[RENDER] DemoSection", {
+    processingFiles,
+    uploadedFiles,
+    currentStep,
+    isLoading
+  });
+
+  // Log state changes
+  useEffect(() => {
+    console.log("[STATE CHANGE] processingFiles:", processingFiles);
+  }, [processingFiles]);
+
+  useEffect(() => {
+    console.log("[STATE CHANGE] uploadedFiles:", uploadedFiles);
+  }, [uploadedFiles]);
+
+  useEffect(() => {
+    console.log("[STATE CHANGE] currentStep:", currentStep);
+  }, [currentStep]);
+
+  useEffect(() => {
+    console.log("[STATE CHANGE] isLoading:", isLoading);
+  }, [isLoading]);
+
+  // Sanitize input for XSS and basic SQLi patterns
+  function sanitizeInput(input: string) {
+    // Remove HTML tags and encode special characters
+    let clean = DOMPurify.sanitize(input, {ALLOWED_TAGS: [], ALLOWED_ATTR: []});
+    // Remove common SQL injection patterns (very basic)
+    clean = clean.replace(/['";\-\-]/g, '');
+    return clean;
+  }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
@@ -18,37 +61,40 @@ export default function DemoSection() {
     const files = Array.from(event.target.files);
     
     for (const file of files) {
-      console.log(`Starting upload for ${file.name}`);
+      console.log(`[UPLOAD] Starting upload for ${file.name}`);
       const formData = new FormData();
       formData.append('file', file);
 
       try {
         // Start processing state
         setProcessingFiles(prev => {
-          console.log(`Setting processing state for ${file.name}`);
+          console.log(`[STATE] Setting processing state for ${file.name}`);
           return { ...prev, [file.name]: true };
         });
 
         // Make the API call
-        console.log(`Making API call for ${file.name}`);
+        console.log(`[FETCH] Making API call for ${file.name}`);
         const response = await fetch('http://localhost:5001/upload', {
           method: 'POST',
           body: formData
         });
 
-        console.log(`Received response for ${file.name}:`, response.status);
+        console.log(`[FETCH] Received response for ${file.name}:`, response.status);
         const data = await response.json();
 
         // Clear processing state only after we get the response
         setProcessingFiles(prev => {
-          console.log(`Clearing processing state for ${file.name}`);
+          console.log(`[STATE] Clearing processing state for ${file.name}`);
           const newProcessing = { ...prev };
           delete newProcessing[file.name];
           return newProcessing;
         });
 
         if (response.status === 201) {
-          setUploadedFiles(prev => [...prev, file]);
+          setUploadedFiles(prev => {
+            console.log(`[STATE] Marking ${file.name} as uploaded`);
+            return [...prev, file];
+          });
           toast({
             title: "Success",
             description: `${file.name} uploaded successfully`,
@@ -56,6 +102,7 @@ export default function DemoSection() {
           });
         } else {
           const errorMessage = data.error || 'Upload failed';
+          console.log(`[ERROR] Upload failed for ${file.name}: ${errorMessage}`);
           toast({
             title: "Error",
             description: errorMessage,
@@ -63,8 +110,9 @@ export default function DemoSection() {
           });
         }
       } catch (error) {
-        console.error(`Error uploading ${file.name}:`, error);
+        console.error(`[ERROR] Exception uploading ${file.name}:`, error);
         setProcessingFiles(prev => {
+          console.log(`[STATE] Clearing processing state for ${file.name} after exception`);
           const newProcessing = { ...prev };
           delete newProcessing[file.name];
           return newProcessing;
@@ -77,6 +125,31 @@ export default function DemoSection() {
         });
       }
     }
+  };
+
+  // Upload the voice context as a file
+  const handleVoiceSubmit = async () => {
+    if (!voiceText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a description before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const sanitized = sanitizeInput(voiceText.trim());
+    const timestamp = Date.now();
+    const filename = `voice_context_${timestamp}.txt`;
+    const file = new File([sanitized], filename, { type: 'text/plain' });
+    // Reuse the upload logic by creating a mock event with a real FileList
+    const mockEvent = {
+      target: {
+        files: fileArrayToFileList([file]),
+      },
+    } as React.ChangeEvent<HTMLInputElement>;
+    await handleFileUpload(mockEvent);
+    // Optionally clear the textarea after upload
+    setVoiceText("");
   };
 
   return (
@@ -139,15 +212,21 @@ export default function DemoSection() {
                         Please describe the voice you would like to have in answering grant application questions. How do you want your voice to be heard? What specific characteristics make you who you are? You are doing important work. Brag a little!
                       </p>
                     </div>
-
                     <div className="border-2 border-dashed border-teal/30 rounded-lg p-8 text-center">
                       <textarea 
-                        className="w-full h-32 p-4 rounded-lg border border-teal/30 focus:outline-none focus:ring-2 focus:ring-teal/50"
+                        className="w-full h-32 p-4 rounded-lg border border-teal/30 focus:outline-none focus:ring-2 focus:ring-teal/50 text-black"
                         placeholder="Describe your organization's voice..."
+                        value={voiceText}
+                        onChange={e => setVoiceText(e.target.value)}
                       />
                     </div>
-                    
-                    <div className="flex justify-end mt-6">
+                    <div className="flex justify-end mt-6 gap-4">
+                      <button 
+                        onClick={handleVoiceSubmit}
+                        className="bg-teal text-white px-6 py-2 rounded-lg hover:bg-teal/90 transition-colors"
+                      >
+                        Submit & Upload
+                      </button>
                       <button 
                         onClick={() => setCurrentStep(2)}
                         className="bg-teal text-white px-6 py-2 rounded-lg hover:bg-teal/90 transition-colors"
