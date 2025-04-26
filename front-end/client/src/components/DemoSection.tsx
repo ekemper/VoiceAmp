@@ -1,8 +1,10 @@
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { useState } from "react";
 import { Progress } from "./ui/progress";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DemoSection() {
+  const { toast } = useToast();
   const { ref: refSection, inView: inViewSection } = useScrollAnimation();
   const [isLoading, setIsLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
@@ -32,20 +34,45 @@ export default function DemoSection() {
         };
 
         xhr.onload = () => {
-          if (xhr.status === 200) {
+          if (xhr.status === 201) {
             setUploadedFiles(prev => [...prev, file]);
             setUploadProgress(prev => {
               const newProgress = { ...prev };
               delete newProgress[file.name];
               return newProgress;
             });
+            toast({
+              title: "Success",
+              description: `${file.name} uploaded successfully`,
+              variant: "default",
+            });
           } else {
-            console.error('Upload failed:', xhr.statusText);
+            let errorMessage = 'Upload failed';
+            try {
+              const response = JSON.parse(xhr.responseText);
+              errorMessage = response.error || errorMessage;
+            } catch (e) {
+              // If parsing fails, use the default error message
+            }
+            toast({
+              title: "Error",
+              description: errorMessage,
+              variant: "destructive",
+            });
+            setUploadProgress(prev => {
+              const newProgress = { ...prev };
+              delete newProgress[file.name];
+              return newProgress;
+            });
           }
         };
 
         xhr.onerror = () => {
-          console.error('Upload failed');
+          toast({
+            title: "Error",
+            description: `Failed to upload ${file.name}. Please try again.`,
+            variant: "destructive",
+          });
           setUploadProgress(prev => {
             const newProgress = { ...prev };
             delete newProgress[file.name];
@@ -55,7 +82,11 @@ export default function DemoSection() {
 
         xhr.send(formData);
       } catch (error) {
-        console.error('Upload failed:', error);
+        toast({
+          title: "Error",
+          description: `Failed to upload ${file.name}. Please try again.`,
+          variant: "destructive",
+        });
         setUploadProgress(prev => {
           const newProgress = { ...prev };
           delete newProgress[file.name];
