@@ -10,6 +10,7 @@ export default function DemoSection() {
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [processingFiles, setProcessingFiles] = useState<{ [key: string]: boolean }>({});
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
@@ -17,80 +18,62 @@ export default function DemoSection() {
     const files = Array.from(event.target.files);
     
     for (const file of files) {
+      console.log(`Starting upload for ${file.name}`);
       const formData = new FormData();
       formData.append('file', file);
 
       try {
-        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
-        
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:5001/upload');
-        
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = (event.loaded / event.total) * 100;
-            setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
-          }
-        };
+        // Start processing state
+        setProcessingFiles(prev => {
+          console.log(`Setting processing state for ${file.name}`);
+          return { ...prev, [file.name]: true };
+        });
 
-        xhr.onload = () => {
-          if (xhr.status === 201) {
-            setUploadedFiles(prev => [...prev, file]);
-            setUploadProgress(prev => {
-              const newProgress = { ...prev };
-              delete newProgress[file.name];
-              return newProgress;
-            });
-            toast({
-              title: "Success",
-              description: `${file.name} uploaded successfully`,
-              variant: "default",
-            });
-          } else {
-            let errorMessage = 'Upload failed';
-            try {
-              const response = JSON.parse(xhr.responseText);
-              errorMessage = response.error || errorMessage;
-            } catch (e) {
-              // If parsing fails, use the default error message
-            }
-            toast({
-              title: "Error",
-              description: errorMessage,
-              variant: "destructive",
-            });
-            setUploadProgress(prev => {
-              const newProgress = { ...prev };
-              delete newProgress[file.name];
-              return newProgress;
-            });
-          }
-        };
+        // Make the API call
+        console.log(`Making API call for ${file.name}`);
+        const response = await fetch('http://localhost:5001/upload', {
+          method: 'POST',
+          body: formData
+        });
 
-        xhr.onerror = () => {
+        console.log(`Received response for ${file.name}:`, response.status);
+        const data = await response.json();
+
+        // Clear processing state only after we get the response
+        setProcessingFiles(prev => {
+          console.log(`Clearing processing state for ${file.name}`);
+          const newProcessing = { ...prev };
+          delete newProcessing[file.name];
+          return newProcessing;
+        });
+
+        if (response.status === 201) {
+          setUploadedFiles(prev => [...prev, file]);
+          toast({
+            title: "Success",
+            description: `${file.name} uploaded successfully`,
+            variant: "default",
+          });
+        } else {
+          const errorMessage = data.error || 'Upload failed';
           toast({
             title: "Error",
-            description: `Failed to upload ${file.name}. Please try again.`,
+            description: errorMessage,
             variant: "destructive",
           });
-          setUploadProgress(prev => {
-            const newProgress = { ...prev };
-            delete newProgress[file.name];
-            return newProgress;
-          });
-        };
-
-        xhr.send(formData);
+        }
       } catch (error) {
+        console.error(`Error uploading ${file.name}:`, error);
+        setProcessingFiles(prev => {
+          const newProcessing = { ...prev };
+          delete newProcessing[file.name];
+          return newProcessing;
+        });
+        
         toast({
           title: "Error",
           description: `Failed to upload ${file.name}. Please try again.`,
           variant: "destructive",
-        });
-        setUploadProgress(prev => {
-          const newProgress = { ...prev };
-          delete newProgress[file.name];
-          return newProgress;
         });
       }
     }
@@ -189,15 +172,33 @@ export default function DemoSection() {
                       <div className="flex flex-col items-center">
                         <i className="ri-upload-cloud-line text-4xl text-teal mb-4"></i>
                         <p className="text-navy mb-4">Drag and drop files here or</p>
-                        <label className="bg-teal text-white px-4 py-2 rounded-lg cursor-pointer hover:bg-teal/90 transition-colors">
-                          <input 
-                            type="file" 
-                            className="hidden" 
-                            multiple 
-                            accept=".pdf,.txt,.rtf"
-                            onChange={handleFileUpload}
-                          />
-                          Browse Files
+                        <label className={`${
+                          Object.keys(processingFiles).length > 0 
+                            ? 'bg-teal/50 cursor-not-allowed'
+                            : 'bg-teal cursor-pointer hover:bg-teal/90'
+                          } text-white px-4 py-2 rounded-lg transition-colors inline-flex items-center gap-2`}
+                        >
+                          {Object.keys(processingFiles).length > 0 ? (
+                            <>
+                              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>Parsing Context Document...</span>
+                            </>
+                          ) : (
+                            <>
+                              Browse Files
+                              <input 
+                                type="file" 
+                                className="hidden" 
+                                multiple 
+                                accept=".pdf,.txt,.rtf"
+                                onChange={handleFileUpload}
+                                disabled={Object.keys(processingFiles).length > 0}
+                              />
+                            </>
+                          )}
                         </label>
                       </div>
                       {uploadedFiles.length > 0 && (
@@ -213,12 +214,6 @@ export default function DemoSection() {
                           </ul>
                         </div>
                       )}
-                      {Object.entries(uploadProgress).map(([fileName, progress]) => (
-                        <div key={fileName} className="mt-4">
-                          <p className="text-navy/70 text-sm">{fileName}</p>
-                          <Progress value={progress} className="w-full h-2" />
-                        </div>
-                      ))}
                     </div>
                     
                     <div className="flex justify-between mt-6">
